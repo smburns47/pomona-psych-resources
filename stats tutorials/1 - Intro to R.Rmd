@@ -1,0 +1,107 @@
+---
+title: "Intro to R"
+author: "Mary Peterson"
+date: "2023-06-01"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#This comment is inside a "chunk". Chunks organize code and allow commands to be run separately.
+#To make a comment, simply put a pound sign at the beginning of a line of code.
+```
+
+```{r}
+#This is how you install packages to save in your library. Put the package that you want in the quotation marks.
+#You may receive warning messages when downloaded, this is normal and you should still be able to use the packages.
+
+#This is installing packages called tidyr and jmv (also known as jamovi)
+
+install.packages("tidyr")
+install.packages("jmv")
+
+```
+
+```{r}
+#Once you install the packages, you need to "load" them in order to use them for your code. When packages are installed, they are put into the virtual library on standby. To use specific packages, you must load them using the code below:
+
+library(tidyr)
+library(jmv)
+
+```
+
+```{r}
+#Execute your first bit of code. Press the play button located at the right corner of this chunk.
+
+print("Hello world!")
+```
+
+```{r}
+#You can also use R code to run basic arithmetic. Basic math symbols like +, -, *, \, etc. can be used in R. Try running the code below:
+
+5 + 1
+10 - 3
+2 * 4
+9 / 3
+
+#Notice that you can put more than one line or code in a single chunk. When you press the Run button, all of the commands will be run, one after the other, in the order in which they appear.
+
+```
+
+```{r}
+#An object is something that you define in R that can be saved and later accessed. Think of an object like a box that you can put anything into - a number, a message, etc. The value of the object is whatever is inside the box, while the name of the object is whatever you choose to name the object so that both you and the computer can refer to it later. After creating an object and assigning it a value, you can use the name of the object in later commands to stand in for its value.
+
+#To assign an object (i.e., assign a value to the name), you need to use an assignment operator. Much like + and - are operators that tell the computer do some math, an assignment operator tells the computer to assign a value to an object name. In R, the assignment operator looks like an arrow: <-
+
+#Below is a simple example of this:
+
+    # This code will assign the number 47 to the R object favorite_number
+    favorite_number <- 47
+    
+    # This code returns the value of my_favorite_number. Notice that you don't need to use the print() function 
+    # to print the contents of an R object; you can just type the name of the object
+    favorite_number
+ 
+```
+
+```{r}
+#Anything can be saved into an object, even if it's a complex command with lots of actions (or other objects!) in it. For example, compare the value of step3 to the value of all_steps by printing them out and evaluating the answers
+    
+    step1 <- 2*3
+    step2 <- 9/3
+    step3 <- step1 + step2
+    
+    all_steps <- (2*3) + (9/3)
+    
+    step3
+    all_steps
+
+```
+
+```{r}
+#Now, we move on to functions. Functions have three parts: the name of the function, the arguments, and then output. See the example of a function below:
+
+descriptives(dat, vars = c("Pages"), splitBy = "Degree", hist = TRUE, sd = TRUE, se = TRUE)
+
+#In this function, "descriptives" is the name of the function and the rest are the arguments. Note: you will not be able to run this function because you do not have the data loaded in R. This is just an example of a function with multiple arguments.
+
+#Sometimes, functions only need one argument. The output will be "Hello world!":
+print("Hello world!")
+```
+
+```{r}
+#R is very picky. Try running the code below:
+print("Hello world!"
+
+      
+#R was unable to run this code because the function is missing a parenthesis at the end of the function. When you code in R, you will undoubtedly experience lots of errors. Even the most experienced coders will have errors in their code at first. When this happens to you, consider it the "first draft" of your code that you then refine until your code does what you want. No one writes a perfect essay on their first shot, and likewise no one writes perfect code the first time.
+
+```
+
+
+
+
+

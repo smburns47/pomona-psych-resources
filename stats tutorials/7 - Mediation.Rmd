@@ -1,0 +1,192 @@
+---
+title: "6 - Mediation"
+author: "Mary Peterson"
+date: "2023-07-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***The Data***
+Parents with anxiety disorders have an increased likelihood of having children with anxiety disorders (see work by Bogels, Borelli, Wood, or Rapee). This has led some to hypothesize that anxiety is genetically transmitted. However, you think there might be something else going on. Parental overcontrol, the excess regulation of a child's emotion, cognition, and behavior is strongly related to child anxiety. You wonder if anxious parents are more overcontrolling, leading to child anxiety. You decided to conduct a study to figure this out. 
+
+***Variables***
+parent.anx: 1-20 (higher scores indicating higher anxiety symptoms)
+child.anx: 1-20 (higher scores indicating higher anxiety symptoms)
+parent.oc: 1-20 (higher scores indicating greater use of overcontrol)
+
+***Demonstration***
+The present R demonstration will show you how to conduct a mediation analysis. We'll do the analysis with the following variables:
+
+Predictor variable: parent.anx
+Mediator variable: parent.oc
+Outcome variable: child.anx
+
+
+```{r}
+# All the packages we'll need
+library(foreign)
+library(broom)
+library(robmed)
+library(tidyverse)
+library(mediation)
+library(multilevel)
+library(psych)
+library(jmv)
+library(ggplot2)
+library(magrittr)
+library(apaTables)
+library(GGally)
+library(lsr)
+library(car)
+library(mvnTest)
+library(QuantPsyc)
+```
+
+```{r}
+# Read in the data
+dat <- read.csv("Data for Mediation.csv")
+```
+
+```{r}
+# Descriptives of your data
+desc <- descriptives(data = dat, hist = TRUE, sd = TRUE, range = TRUE, skew = TRUE, kurt = TRUE)
+desc
+```
+
+```{r}
+# Scatterplot of parent anxiety and child anxiety
+scatter.parent.anx <- ggplot(dat, aes(parent.anx, child.anx))
+scatter.parent.anx + geom_point() + geom_smooth(method = "lm", colour = "Blue", se = FALSE) + labs(x = "Parent Anxiety", y = "Child Anxiety")
+
+# Scatterplot of parent overcontrol and child anxiety
+scatter.parent.oc <- ggplot(dat, aes(parent.oc, child.anx))
+scatter.parent.oc + geom_point() + geom_smooth(method = "lm", colour = "Blue", se = FALSE) + labs(x = "Parent Overcontrol", y = "Child Anxiety")
+
+```
+
+```{r}
+# Correlation table
+cor <- corrMatrix(dat[2:4], flag = TRUE)
+cor
+
+# Exporting an APA formatted correlation table to the same folder that this RStudio file is saved
+apa.cor.table(dat[c(2:4)], filename = "Correlation Table.doc", table.number = 1, show.sig.stars = TRUE, landscape = TRUE)
+```
+
+
+***Checking Assumptions***
+```{r}
+# Create a saturated models of correlated variables to test normality and homoscedasticity 
+satmodel <- lm(child.anx ~ parent.anx + parent.oc, data=dat)
+
+
+# HOMOSCEDASTICITY
+# Plot fitted values v. residuals to examine homoscedasticity
+ggplot(satmodel, aes(.fitted, .resid))+geom_point()+geom_hline(yintercept=0, col="red", linetype="dashed")+xlab("Fitted values")+ylab("Residuals")+ggtitle("Residual vs Fitted Plot")+theme_bw()
+
+# Breusch Pagan test of homoscedasticity
+ncvTest(satmodel)
+# Results show that data are homoscedastic (non-significant p-value)
+```
+
+```{r}
+# MULTIVARIATE NORMALITY
+# Q-Qplot to look at multivariate normality
+ggplot(satmodel, aes(qqnorm(.stdresid)[[1]], .stdresid))+geom_point(na.rm = TRUE)+xlab("Theoretical Quantiles")+ylab("Standardized Residuals")+ggtitle("Normal Q-Q")
+
+# Henze-Zinkler test of multivariate normality
+HZ.test(dat[2:4])
+# Results indicate that data are multivariate normal
+```
+
+
+***Mediation Analaysis***
+```{r}
+# These first analyses are using Baron & Kenny's approach and testing the indirect effect using Sobel's test. 
+# The Baron and Kenny approach tests all of the paths of the mediation separately, as seen below:
+
+# Step 1: Regress Y (child.anx) onto X (parent.anx) - Path c, also known as total effect
+model.bk1 <- linReg(data = dat, dep = 'child.anx', 
+                 covs = c('parent.anx'), 
+                 blocks = list(
+                   list('parent.anx')), 
+                collin = TRUE, 
+                stdEst = TRUE,
+                ci = TRUE)
+model.bk1
+
+# Step 2: Regress M (parent.oc) onto X (parent.anx) - Path a
+model.bk2 <- linReg(data = dat, dep = 'parent.oc', 
+                 covs = c('parent.anx'), 
+                 blocks = list(
+                   list('parent.anx')), 
+                collin = TRUE, 
+                stdEst = TRUE,
+                ci = TRUE)
+model.bk2
+
+# Step 3: Regress Y (child.anx) onto X (parent.anx) and M (parent.oc) - Path b, relationship between M and Y while accounting for X
+model.bk3 <- linReg(data = dat, dep = 'child.anx', 
+                 covs = c('parent.anx', 'parent.oc'), 
+                 blocks = list(
+                   list('parent.anx', 'parent.oc')), 
+                collin = TRUE, 
+                stdEst = TRUE,
+                ci = TRUE)
+model.bk3
+
+
+# For the B & K approach, you must meet the following criteria for there to be a full or partial mediation. At step 1, path c (total effect) must be significant. At step 2, path a must be significant. At step 3, the relationship between M and Y should be significant. Finally, if all of those are met, you have a full mediation if at step 3, there is NOT a significant relationship between X and Y. You have a partial mediation if there is still a significant relationship between X and Y.
+```
+
+```{r}
+# Baron and Kenny's approach alone cannot tell you if the overall indirect path is significant. It can only tell you if path a and path b are significant separately.
+
+# We can test the indirect path using Sobel's test 
+test_mediation(child.anx ~ parent.anx + m(parent.oc), test = c("sobel"), data = dat)
+
+# Results show indirect path is significant
+```
+
+```{r}
+# A more ideal option than the one above:
+
+# We can use the "mediate" function from the package "mediation" to run the entire mediation model. This is different from the Baron and Kenny approach, which tests the three paths (Y ~ X, M ~ X, Y ~ X + M) separately. The B & K approach has limitations, such as low power and lack of testing indirect effect. This is also different from the Sobel's test, which tests the indirect path by multiplying paths a and b of the mediation model. This can be problematic, because the test assumes a normal distribution which is often not present when calculating the product of paths a and b. The test below uses bootstrapping to be able to test the indirect effect without running into the normality issue.
+
+# Bootstrapping is a statistical method that utilizes random resampling with replacement to estimate a population parameter. The dataset is treated as the population, and each random sample aims to replicate a potential score within the true population. The amount of samples varies, but usually falls between 1,000 and 10,000. For more information on bootstrapping for a mediation, see this page: https://crumplab.com/psyc7709_2019/book/docs/bootstrapped-mediation-tutorial.html
+
+# Specify the mediator model first (M ~ X)
+model.med <- lm(parent.oc ~ parent.anx, dat)
+
+# Specify the outcome model second (Y ~ X + M)
+model.out <- lm(child.anx ~ parent.anx + parent.oc, dat)
+
+# Estimate parameters of the model. This is where we ask R to bootstrap 10,0000 simulations with confidence intervals ("perc"). You'll need to tell R which variable is the predictor and which is the mediator. It usually takes a little longer for computers to run this code because of the bootstrapping.
+med <- mediation::mediate(model.med, model.out, sims = 10000, boot = TRUE, boot.ci.type = "perc", treat = "parent.anx", mediator = "parent.oc", conf.level = 0.95, long = TRUE)
+
+# Summarize the parameter estimates
+summary(med)
+
+# if you want the individual a and b paths, you need to ask for them
+lm.beta(model.med)
+lm.beta(model.out)
+
+
+# Key for interpretation:
+# ACME (Average Causal Mediation Effect) is the indirect effect (paths a*b)
+# ADE (Average Direct Effect) is the direct effect (path c')
+# Total Effect is, you guessed it, the total effect (path c)
+# Prop. Mediated is the proportion of the total effect that is transmitted through the mediator. E.g., 46.4% of total effect is because of parent overcontrol.
+
+# Estimate is the standardized regression coefficient
+
+# Note: because this analysis uses bootstrapping, you should look at and report the confidence intervals rather than the p-values. In this example, all paths have confidence intervals that do not include zero. This shows that parent overcontrol partially mediates the relationship between parent anxiety and child anxiety
+ 
+```
+
+
+
+

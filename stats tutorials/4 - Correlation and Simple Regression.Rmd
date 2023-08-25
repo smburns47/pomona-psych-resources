@@ -1,0 +1,218 @@
+---
+title: "3 - Correlation and Simple Regression"
+author: "Mary Peterson"
+date: "2023-06-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Read in your data. As long as its in the same folder as the RMD file, this is the only code you need. 
+dat <- read.csv("Data for Correlation and Simple Regression.csv")
+
+```
+
+
+***The Data***
+A local business has implemented a new program to encourage employees to take more control over their workday. According to the program, employees are allowed to take their break at any point during the day for as long as they want, as long as it's 60 minutes or less. The business was wondering how this program may relate to productivity on a 1-80 scale. At the end of the first month, the business conducted a short survey which had all 205 employees report the average length of their break. The business employed you to investigate how break length may relate to productivity.
+
+***Variables:***
+Length - numeric; length of break in minutes.
+Enjoy - numeric; self-reported level of enjoyment of break period (scale average; range 1-10).
+Product (Productivity) - numeric; percentage of time meeting weekly goals (range 1-80; represented as whole number).
+Environment - categorical; employee works from office or from home.
+
+```{r}
+# Change the Environment column from character to factor
+dat$Environment <- as.factor(dat$Environment)
+
+# Make new column for Environment called Enviornment.Num, where the values are recoded to be dummy coded
+library(dplyr)
+
+dat <- dat %>%
+  mutate(Environment.Num = recode(Environment, "Office" = 0, "Home" = 1))
+
+```
+
+***Descriptives and Visualization***
+```{r}
+library(jmv)
+# Descriptives of your data. Notice -c(1, 5:6). This means that we don't want to include these columns in the descriptives. 
+desc <- descriptives(data = dat[-c(1, 5:6)], hist = TRUE, sd = TRUE, range = TRUE, skew = TRUE, kurt = TRUE)
+desc
+```
+
+```{r}
+# Same descriptives, but this time splitting it by work environment
+desc <- descriptives(data = dat[-c(1, 6)], splitBy = Environment, hist = TRUE, sd = TRUE, range = TRUE, skew = TRUE, kurt = TRUE)
+desc
+```
+
+```{r}
+library(ggformula)
+
+# Another histogram option for a variable
+gf_histogram(~ Enjoy, data = dat)
+
+# Histogram of numeric variable Enjoy split by Environment. This code also added different colors for the Environment categories. You can play around with other colors.
+enjoy_by_environ <- gf_histogram(~ Enjoy, data = dat, fill = ~ Environment, title = "Histogram of Break Enjoyment by Environment")
+gf_refine(enjoy_by_environ, scale_fill_manual(values = c("purple", "orange")))
+
+# Same graph, black and grey instead
+enjoy_by_environ2 <- gf_histogram(~ Enjoy, data = dat, fill = ~ Environment, title = "Histogram of Break Enjoyment by Environment")
+gf_refine(enjoy_by_environ2, scale_fill_manual(values = c("black", "slategrey")))
+
+# Yet another histogram option. This one also splits Enjoy by Environment, but plots individual histograms for each Environment category
+gf_histogram(~ Enjoy, data = dat) %>% 
+  gf_facet_grid(., ~ Environment)
+```
+
+```{r}
+library(ggplot2)
+# Scatterplots
+# These can help you get an idea of the linearity (or lack thereof) in your data
+
+
+
+# Creates a scatter plot of Enjoy and Product. Naming it "scatter1". Make sure that all of your scatterplots have different names so that you don't overwrite previous ones.
+scatter1 <- ggplot(dat, aes(Enjoy, Product))
+
+# Makes scatter1 visually appealing. Adds colors, axis labels, and a theme. You can play with other colors or arguments to tweak the scatterplot to fit your needs.
+scatter1 + geom_point() + geom_smooth(method = "lm", colour = "Red") + ggtitle("Break Enjoyment Predicting Work Productivity") + labs(x = "Break Enjoyment", y = "Productivity") + theme(plot.title = element_text(hjust = 0.5))
+
+
+
+
+# Same scatterplot as above but for Length and Product. 
+scatter2 <- ggplot(dat, aes(Length, Product))
+
+scatter2 + geom_point() + geom_smooth(method = "lm", colour = "Red") + ggtitle("Break Length Predicting Work Productivity") + labs(x = "Break Length", y = "Productivity") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+***Correlations***
+```{r}
+# Option 1 - cor function from stats package. Looking at correlations for columns 2 - 4. The round(2) is asking R to round the values to 2 decimal places.
+cor <- cor(dat[c(2:4)]) %>% round(2)
+cor
+
+# Make it visual
+library(corrplot)
+corrplot(cor, method="circle")
+corrplot(cor, method="color", type = "lower")
+corrplot(cor, method="number", type = "lower")
+```
+
+```{r}
+# Option 2 - corrMatrix function from jmv package. This will flag significant correlations. There are multiple other useful arguments; you can look them up by typing "corrMatrix" into the search bar of the help tab on the bottom right section of this R window.
+cor2 <- corrMatrix(dat[c(2:4)], flag = TRUE)
+cor2
+```
+
+```{r}
+# Option 3 - Create an APA table using the apaTables package
+# Note: This will export a correlation table as a Word document into the same folder that you have this R Studio file saved. The table will be in APA format for your convenience.
+library(apaTables)
+apa.cor.table(dat[c(2:4)], filename = "Correlation Table.doc", table.number = 1, show.sig.stars = TRUE, landscape = TRUE)
+```
+
+***Checking Assumptions***
+Before conducting the simple regression of Length predicting Productivity, we must first check that the data do not violate the assumptions of simple linear regression. These assumptions are: independence, linearity, normality, and homoscedasticity. The assumption of independence is already met because all observations were independent from one another.
+
+For a more detailed explanation of each assumption for simple linear regression, see this page: https://www.statology.org/linear-regression-assumptions/
+
+
+```{r}
+# Linearity - Let's look again at the scatterplot of Length and Productivity.
+scatter2 <- ggplot(dat, aes(Length, Product))
+
+scatter2 + geom_point() + geom_smooth(method = "lm", colour = "Red") + ggtitle("Break Length Predicting Work Productivity") + labs(x = "Break Length", y = "Productivity") + theme(plot.title = element_text(hjust = 0.5))
+
+# A visual inspection of the scatterplot indicates the data appear to be mostly linear. However, it also shows that there's a moderate amount of employees who, regardless of break length, scored very low on productivity. There may be issues within the data (floor effects, unmeasured systematic error, etc.). This is something to take note of and potentially manage.
+
+```
+
+```{r}
+# Homoscedasticity - Are the variances of the residuals the same across all values of X?
+
+# First, you need to specify the model that you are interested in (Y ~ X)
+model <- lm(Product ~ Length, data = dat)
+
+# Now, use the model you just specified to plot fitted values vs. residuals. This can see if data are heteroscedastic.
+ggplot(model, aes(.fitted, .resid))+geom_point()+geom_hline(yintercept=0, col="green", linetype="dashed")+xlab("Fitted Values")+ylab("Residuals")+ggtitle("Residual vs. Fitted Plot")+theme_bw()
+
+# Breusch Pagan Test of homoscedasticity
+library(car)
+ncvTest(model)
+# Significant results of this test (p < .05) indicate that the data are heteroscedastic. Interpret linear regression results with caution.
+```
+
+```{r}
+# Normality - Are the residuals normally distributed? 
+
+# First, let's look at a q-q plot to look at normality. If normalally distributed, the points should take the shape of a straight, diagonal line.
+ggplot(model, aes(qqnorm(.stdresid)[[1]], .stdresid))+geom_point(na.rm = TRUE)+xlab("Theoretical Quantiles")+ylab("Standardized Residuals")+ggtitle("Normal Q-Q")
+
+# Extract the from our model in the chunk above
+residuals <- residuals(model)
+
+# Shapiro-Wilk's test for normality
+shapiro.test(residuals)
+# If the p-value of the test is greater than 0.05 (not significant), it suggests that the residuals are normally distributed. However, it's important to note that with a large sample size, even minor departures from normality can lead to a significant test result. 
+```
+
+***Simple Regression***
+
+```{r}
+# Uncentered simple regression work productivity regressed on length of break
+reg.model <- linReg(data = dat, 
+                 dep = 'Product', 
+                 covs = c('Length'), #all the predictors you want available
+                 blocks = list(c('Length')), 
+                 modelTest = TRUE, 
+                 stdEst = TRUE,
+                 ci = TRUE)
+reg.model
+
+```
+
+```{r}
+# Center your predictor for interpretability
+dat$Length.c <- dat$Length - mean(dat$Length)
+
+# Same simple regression as above, but with Length centered
+reg.model.c <- linReg(data = dat, 
+                 dep = 'Product', 
+                 covs = c('Length.c'), 
+                 blocks = list(c('Length.c')), 
+                 modelTest = TRUE, 
+                 stdEst = TRUE,
+                 ci = TRUE)
+reg.model.c
+```
+
+```{r}
+#This is another code for regression. Not as visually appealing, but same estimates.
+reg.model2 <- lm(Product ~ Length, data = dat)
+reg.model2
+
+# The benefit of the code above is that it is able to be converted into an APA table. 
+# Note: This will export the table as a Word document into the same folder that you have this R Studio file saved.
+apa.reg.table(reg.model2,filename="APA Reg Table.doc", table.number=2)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+

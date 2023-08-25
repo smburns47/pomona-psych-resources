@@ -1,0 +1,286 @@
+---
+title: "3 - Data Visualizations"
+author: "Mary Peterson"
+date: "2023-08-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# This demo will show you how to create various data visualizations in R using "tidyverse".Tidyverse is a collection of R packages, that work together for data manipulation, visualization, and analysis workflows. Within tidyverse, there is a package called "ggplot" that can create data visualizations. While there are other packages that can produce many great visualizations, ggplot is a great place to start because it is so versatile.
+
+# For a more comprehensive discussion of ggplot, check out this resource: https://ggplot2-book.org/
+
+# Load the tidyverse library, which contains ggplot
+library(tidyverse)
+
+# Read in your data
+dat <- read.csv("Data for Data Visualizations.csv")
+```
+
+```{r}
+# Changing categorical variables from character to factor
+dat$City <- as.factor(dat$City)
+dat$Librarycard <- as.factor(dat$Librarycard)
+
+```
+
+```{r}
+# ggplot works with dataframes to built graphics using the layers you build in the code. 
+# Here are the components of a graphic (Source: Freeman & Ross, 2019):
+    # data
+    # geometric objects (geoms)
+    # aesthetics
+    # statistical transformations 
+    # position adjustments
+    # scale
+    # coordinate system
+    # facets
+    # themes
+
+# The first layer of your graphic will always be to specify that you would like to use ggplot
+
+ggplot()
+
+# Notice that this just will give you a blank graphic. This is our starting point and we will built it up from there.
+```
+
+```{r}
+# Let's add another layer to the graphic code. 
+
+ggplot(dat, aes(x = City, y = Booksread.audio))
+
+# Now, the graphic has the x and y axes which correspond to the dataframe that was specified (i.e., dat). Specifying the axes is case sensitive, so you must give R the same name that the variable has in the dataframe. Note: you can actually drop the x = and y = and the code will run the same. Adding it is simply a helpful reminder of which variable is X and which is Y.
+
+```
+
+```{r}
+# The next layer we can add is a "geom" which is a geometric object. Geoms are graphical representations of the data. There are many types of geoms, which you can find here: https://ggplot2.tidyverse.org/reference/#geoms
+
+# Geoms start with "geom_" and then end with the graphical object that you desire, e.g., "geom_line()" or "geom_boxplot()"
+# To add the geom label, add a plus sign after our first layer and add the geom. To keep everything tidy, it can be helpful to start the geom layer on a new line, like we do below.
+
+ggplot(dat, aes(x = City, y = Booksread.audio)) +
+  geom_point()
+
+# What it can look like when both X and Y are continuous
+ggplot(dat, aes(x = Commute.roundtrip, y = Booksread.audio)) +
+  geom_point()
+
+# Now, a different geom; this time, we will use geom_boxplot()
+ggplot(dat, aes(x = City, y = Booksread.audio)) +
+  geom_boxplot()
+
+# It's important to always consider the type of data (continuous/categorical) you have when visualizing. Some geoms only will run with a particular data type.
+
+```
+
+```{r}
+# You can also use something called a "pipe operator" in your ggplot code (and several other packages) to to chain together multiple operations in a way that mirrors the natural flow of reading and understanding code. A pipe operator (%>%) means "and then", similar to using a plus sign to add on a command. By using a pipe, you're telling R to run the first line of code AND THEN run the next line of code.
+
+# Often in R tutorials and examples, you'll see the name of the dataframe and then the pipe operator, as seen below. 
+dat %>%
+ggplot(aes(x = City, y = Booksread.audio)) +
+  geom_boxplot()
+
+# This code does the same as the code in the chunk above, it just specifies the dataframe first using a pipe operator
+```
+
+```{r}
+# Now we can play with the aesthetic mapping of ggplot, which are the visual properties of the graphic. To add an aesthetic layer to the graphic, use aes(). You may notice that we already have used this to define the axes. Let's also add colors to the Librarycard variable by adding "color = Librarycard" in aes().
+
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio, color = Librarycard)) +
+  geom_point()
+
+# You can also change the aesthetic mapping on the geom.
+dat %>%
+ggplot() +
+  geom_point(aes(x = Librarycard, y = Booksread.audio, colour = Librarycard))
+
+# The output from both codes look the same, right? The difference is that when you change the ggplot() layer, the aesthetics will be applied to all subsequent layers. If you apply the aesthetic to an individual layer, it will apply the aesthetics to just that one portion. If we had more layers, the two codes would produce visualizations with different visual properties.
+
+```
+
+```{r}
+# A note on color for ggplot
+# If you want each category of a variable to have a different color, as we have been doing, you put the color argument in aes(). If you want the color to be the same for all categories of your variable (e.g., all points to be blue), you put the color argument outside aes(). 
+
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_point(aes(), color = "blue")
+
+# Try the same concept for a boxplot instead
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_boxplot(aes(), color = "blue")
+
+#Looks like that only made the outline blue. Here's how to fill the boxes. We needed to use the "fill" argument instead.
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_boxplot(aes(), fill = "blue")
+
+
+# This also works for geom_point(). Here, we chose the shape, color of the inside, and color of the outline of the points.
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_point(aes(), shape = 21, fill = "green4", color = "navy")
+
+# Let's mess with some other specifications you can make to the aesthetic. Here we've specified the shape, the color, the size, and the stroke (line thickness) of the points. There are many changes we can make to aesthetics, these are just a few examples.
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_point(aes(), shape = 11, color = "blue", size = 6, stroke = 2)
+
+# Remember, if you want the fill to be different colors, put it INSIDE aes()
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio))+
+  geom_boxplot(aes(fill = Librarycard), color = "black")
+
+```
+
+```{r}
+# We haven't made a line graph yet. Let's make a simple one first. In this line graph, we specify that we want three separate lines. You do this by specifying a categorical variable as the group using "group = ".
+dat %>%
+ggplot(aes(x = Milestolibrary, y = Booksread.audio, group = City)) +
+  geom_line()
+
+# This is the same line graph above but aesthetics added, like dashed lines
+dat %>%
+ggplot(aes(x = Milestolibrary, y = Booksread.audio, group = City)) +
+  geom_line(aes(colour = City), linetype = "dashed")
+
+# Now let's add points to it as well. It's as simple as + geom_point()
+dat %>%
+ggplot(aes(x = Milestolibrary, y = Booksread.audio, group = City)) +
+  geom_line(aes(colour = City), linetype = "dashed") +
+  geom_point()
+
+# And if you want to change the aesthetics of the points, simply add them with aes() in geom_point()
+dat %>%
+ggplot(aes(x = Milestolibrary, y = Booksread.audio, group = City)) +
+  geom_line(aes(colour = City), linetype = "dashed") +
+  geom_point(aes(colour = City), size = 3, shape = 8)
+
+# If you're curious about the options for shapes, sizes, etc., you can look them up here: https://ggplot2.tidyverse.org/articles/ggplot2-specs.html
+
+# Here are the color options with their corresponding names: http://sape.inf.usi.ch/quick-reference/ggplot2/colour
+```
+
+```{r}
+# What if you want to change the text of your graphic? That is possible too. Let's add a title and change the format of the axis titles. We add another layer, "labs", for the graphic's labels. You can also use xlab(), ylab(), and ggtitle() to add them individually.
+dat %>%
+ggplot(aes(x = Milestolibrary, y = Booksread.audio, group = City)) +
+  geom_line(aes(colour = City), linetype = "dashed") +
+  geom_point(aes(colour = City), size = 3, shape = 8) +
+  labs(title = "Audiobooks Read and Miles to Library by City", x = "Miles to Local Library", y = "Number of Audiobooks Read")
+
+```
+
+```{r}
+# For some of the finer adjustments in R, you can add a "theme" as another layer. Themes allow us to choose the size, font, color, position, etc. of the graphic's text.
+
+# The default background for ggplot is a light grey, as we've seen. This theme will remove that
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_boxplot(aes(fill = Librarycard), colour = "black") +
+  theme_bw()
+
+# This theme will remove everything from the background
+dat %>%
+ggplot(aes(x = Librarycard, y = Booksread.audio)) +
+  geom_boxplot(aes(fill = Librarycard), colour = "black") +
+  theme_classic()
+
+# You can also try other themes, such as theme_dark(), theme_light(), theme_classic(), theme_void() and more.
+```
+
+```{r}
+# What if you want to change the range of your X or Y axes? 
+
+# "Scales" allow you to change the range on your axes. Here is an example of using scale_y_continuous to specify the start and end limits of the scale.
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip)) +
+  geom_boxplot(aes(fill = City), colour = "black") +
+  labs(title = "Commute by City", x = NULL, y = "Roundtrip Commute in Miles") +
+  theme_classic() +
+  scale_y_continuous(limits = c(0, 100))
+
+# Want to specify where the ticks of the axis are? Use breaks()
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip) )+
+  geom_boxplot(aes(fill = City), colour = "black") +
+  labs(title = "Commute by City", x = NULL, y = "Roundtrip Commute in Miles") +
+  theme_classic() +
+  scale_y_continuous(limits = c(0, 100), breaks = c(20, 40, 60, 80, 100))
+
+# Or, if you don't want any ticks on the Y-axis
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip) )+
+  geom_boxplot(aes(fill = City), colour = "black") +
+  labs(title = "Commute by City", x = NULL, y = "Roundtrip Commute in Miles") +
+  theme_classic() +
+  scale_y_continuous(limits = c(0, 100), breaks = NULL)
+
+# You can also edit the characteristics of the X-axis. It is categorical, so you must use scale_x_discrete(). Here, we are changing the labels on the X-axis from the category names in the data to more specific descriptions.
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip) )+
+  geom_boxplot(aes(fill = City), colour = "black") +
+  labs(title = "Commute by City", x = NULL, y = "Roundtrip Commute in Miles") +
+  theme_classic() +
+  scale_y_continuous(limits = c(0, 100), breaks = NULL) +
+  scale_x_discrete(labels = c("Los Angeles, CA", "Portland, OR", "Seattle, WA"))
+```
+
+```{r}
+# You also can edit your legend. There are many options for editing; change the shape, style, size, get rid of it completely, etc.
+
+# We can remove the legend using "show.legend = FALSE". We put this in the geom_boxplot() since the legend is linked to that layer.
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip)) +
+  geom_boxplot(aes(fill = City), colour = "black", show.legend = FALSE) +
+  theme_classic()
+
+# You can also change the legend text. Notice that when we changed the X-axis labels in the chunk above that the legend didn't change? This is how you change both the X-axis and the legend. We do this by adding the same "labels = c(..." in scale_fill_manual() as well as scale_x_discrete(). Why? Because scale_fill_manual() refers to the colours of your data, and the legend represents that (they are directly linked). scale_x_discrete() is focused solely on the x-axis.
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip)) +
+  geom_boxplot(aes(fill = City), colour = "black") +
+  theme_classic() +
+  scale_fill_manual(name = "City", values = c("darkgreen", "darkblue", "mediumseagreen"), labels = c("Los Angeles, CA", "Portland, OR",   "Seattle, WA")) +
+      scale_x_discrete(labels = c("Los Angeles, CA", "Portland, OR", "Seattle, WA"))
+
+# If you want to change the legend title, you'll use theme(). Remember, themes allow you to choose the size, font, color, position, etc. of the graphic's text. Here, we change the title color, size, face, and position on the boxplot. We also can move the position of the legend.
+dat %>%
+ggplot(aes(x = City, y = Commute.roundtrip)) +
+  geom_boxplot(aes(fill = City), colour = "black") +
+  theme_classic() +
+  scale_fill_manual(name = "City", values = c("darkgreen", "darkblue", "mediumseagreen"), labels = c("Los Angeles, CA", "Portland, OR",   "Seattle, WA")) +
+      scale_x_discrete(labels = c("Los Angeles, CA", "Portland, OR", "Seattle, WA")) +
+  theme(legend.title = element_text(colour = "goldenrod3", size = 14, face = "bold"), legend.position = "top")
+
+```
+
+```{r}
+# We haven't played with a bar plot yet. Let's make one. Even though our X variable is currently continuous in the dataframe, you can use as.factor() to have it plotted as categorical. This is a great way to visualize the counts of your data to see how they are distributed
+dat %>%
+  ggplot(aes(x = as.factor(Podcasts))) + 
+  geom_bar()  
+
+# You can also plot the counts of one variable and "stack" the counts of another variable within.
+dat %>%
+  ggplot(aes(x = as.factor(Podcasts), fill = as.factor(Intent))) +
+  geom_bar(position = "fill")
+
+# If you want them side by side, though, you can add position = "dodge"
+dat %>%
+  ggplot(aes(x = as.factor(Podcasts), fill = as.factor(Intent))) +
+  geom_bar(position = "dodge") +
+  theme_classic()
+```
+
+
+In the following demonstrations (regressions, ANOVAs, etc.), we will use ggplot to visualize our data in several different ways. Now that you have an idea of the code structure for ggplot, try to understand each component of the ggplot codes in the demonstrations to come. This will help you practice the language so that you can play around with visualizations when analyzing your own data! And again, if you want a more comprehensive discussion of what ggplot can do, check out this resource: https://ggplot2-book.org/
+
+

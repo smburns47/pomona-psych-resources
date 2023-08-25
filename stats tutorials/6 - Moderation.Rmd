@@ -1,0 +1,264 @@
+---
+title: "5 - Moderation"
+author: "Mary Peterson"
+date: "2023-07-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+***The Data***
+Although recent studies suggest that the mere presence of a smartphone might negatively impact on working memory capacity, fluid intelligence, and attentional processes, less is known about the individual differences that are liable to moderate this cognitive interference effect. This study tested whether individual differences in emotion-related impulsivity traits (positive urgency and negative urgency) moderate the effect of smartphone availability on cognitive performance. We designed an experiment in which 360 college students (age 18–25 years) completed a laboratory task that assessed visual working memory capacity in three different conditions: two conditions differing in terms of smartphone availability (smartphone turned off and visible - group 1, smartphone in silent mode and visible - group 2) and a condition in which the smartphone was not available and was replaced by a calculator (control condition - group 3).
+
+***Variables***
+group: experimental condition (1 - phone off, 2 - phone silent, 3 - control/calculator) 
+sai: score on the smartphone addiction inventory
+wm: working memory
+ni: negative impulsivity
+pi: positive impulsivity
+
+***Demonstration***
+The present R demonstration will show you how conduct a moderation analysis with moderators that are either continuous or categorical. For the first example, a continuous moderation, we will disregard experimental condition. While this is not best practice based on the research study format, it is simply so that you can have an example of a continuous moderation. The example with a categorical moderator will include the experimental condition as the moderator term.
+
+```{r}
+# Read in the data
+dat <- read.csv("Data for Moderation.csv")
+```
+
+```{r}
+# Descriptives of your data
+library(jmv)
+desc <- descriptives(data = dat, hist = TRUE, sd = TRUE, range = TRUE, skew = TRUE, kurt = TRUE)
+desc
+```
+
+```{r}
+# Scatterplots for each continuous predictor and your outcome variable
+library(ggplot2)
+scatter.ni <- ggplot(dat, aes(ni, wm))
+scatter.ni + geom_point() + geom_smooth(method = "lm", colour = "Blue", se = FALSE) + labs(x = "Negative Impulsivity", y = "Working Memory")
+
+scatter.pi <- ggplot(dat, aes(pi, wm))
+scatter.pi + geom_point() + geom_smooth(method = "lm", colour = "Blue", se = FALSE) + labs(x = "Positive Impulsivity", y = "Working Memory")
+
+scatter.sai <- ggplot(dat, aes(sai, wm))
+scatter.sai + geom_point() + geom_smooth(method = "lm", colour = "Blue", se = FALSE) + labs(x = "Smartphone Addiction Score", y = "Working Memory")
+```
+
+```{r}
+# Correlation table for numeric variables (columns 2 - 5)
+cor <- jmv::corrMatrix(dat[2:5], flag = TRUE)
+cor
+
+# Exporting an APA formatted correlation table to the same folder that this RStudio file is saved
+library(apaTables)
+apa.cor.table(dat[c(2:5)], filename = "Correlation Table.doc", table.number = 1, show.sig.stars = TRUE, landscape = TRUE)
+
+```
+
+***Checking Assumptions***
+For a refresher on the assumptions of multiple regression, see here: https://www.statology.org/multiple-linear-regression-assumptions/
+
+```{r}
+# Create a saturated models of correlated variables to test normality and homoscedasticity 
+satmodel <- lm(wm ~ pi + ni + sai, data=dat)
+
+
+# HOMOSCEDASTICITY
+# Plot fitted values v. residuals to examine homoscedasticity
+ggplot(satmodel, aes(.fitted, .resid))+geom_point()+geom_hline(yintercept=0, col="red", linetype="dashed")+xlab("Fitted values")+ylab("Residuals")+ggtitle("Residual vs Fitted Plot")+theme_bw()
+
+# Breusch Pagan test of homoscedasticity
+library(car)
+ncvTest(satmodel)
+# Results show that data are homoscedastic (non-significant p-value)
+```
+
+```{r}
+# MULTIVARIATE NORMALITY
+# Q-Qplot to look at multivariate normality
+ggplot(satmodel, aes(qqnorm(.stdresid)[[1]], .stdresid))+geom_point(na.rm = TRUE)+xlab("Theoretical Quantiles")+ylab("Standardized Residuals")+ggtitle("Normal Q-Q")
+
+# Henze-Zinkler test of multivariate normality
+library(mvnTest)
+HZ.test(dat[2:5])
+# Data are not multivariate normal
+```
+
+```{r}
+# MULTICOLLINEARITY
+# Show VIF values
+vif_results <- car::vif(satmodel)
+
+print(vif_results)
+#No high levels of multicollinearity
+```
+
+***Continuous Moderations***
+```{r}
+# For moderations, it is important to center continuous variables prior to running the moderation analysis. This prevents high levels of multicollinearity with the interaction term.
+dat$pi.c <- dat$pi - mean(dat$pi, rm.na=TRUE)
+dat$ni.c <- dat$ni - mean(dat$ni, rm.na=TRUE)
+dat$sai.c <- dat$sai - mean(dat$sai, rm.na=TRUE)
+```
+
+```{r}
+# Create a moderator terms (product term). Make sure to create these terms using the CENTERED predictors
+dat$saiXpi <- dat$sai.c*dat$pi.c
+
+dat$saiXni <- dat$sai.c*dat$ni.c
+```
+
+```{r}
+#Hierarchical linear regression with with sai as the moderator between pi on wm. You can add the interaction term second to see how much variance in wm is explained by the moderator term (change in R^2).
+model1 <- linReg(data = dat, 
+                 dep = 'wm', 
+                 covs = c('sai.c', 'pi.c', 'saiXpi'), 
+                 blocks = list(
+                   list('sai.c','pi.c'),
+                   list('saiXpi')), 
+                modelTest = TRUE,
+                collin = TRUE, 
+                stdEst = TRUE,
+                r2Adj = TRUE, 
+                ci = TRUE)
+model1
+```
+
+```{r}
+#Hierarchical linear regression with with sai as the moderator between ni on wm
+model2 <- linReg(data = dat, 
+                 dep = 'wm', 
+                 covs = c('sai.c', 'ni.c', 'saiXni'), 
+                 blocks = list(
+                   list('sai.c','ni.c'),
+                   list('saiXni')), 
+                modelTest = TRUE,
+                collin = TRUE, 
+                stdEst = TRUE,
+                r2Adj = TRUE, 
+                ci = TRUE)
+model2
+```
+
+```{r}
+# The most helpful way to conceptualize a moderation is to graph it. That way, you can see what the relationship is between X and Y when the moderator term is high or low. We operationalize high and low by one standard deviation ABOVE the mean and one standard deviation BELOW the mean of sai.
+
+# Even though the moderation of sai and pi on wm was not significant, we can graph it here so that you have the code.
+library(rockchalk)
+plot <- lm(wm ~ sai.c + pi.c + (sai.c*pi.c), data = dat)
+plot
+modplot <- plotSlopes(plot, plotx = "pi.c", modx = "sai.c", modxVals = "std.dev.", main = "Moderating Role of Smartphone Addiction on Relationship Between Positive Impulsivity and Working Memory")
+```
+
+```{r}
+# You can also see the values of the slopes with this unstandardized simple slopes analysis 
+model.ss <- lm(wm ~ sai.c + pi.c + (sai.c*pi.c), data = dat)
+interactions::sim_slopes(model=model.ss, pred=pi.c, modx=sai.c)
+```
+
+***Categorical Moderations***
+```{r}
+# First, you need to dummy code condition group. Since the variable has 3 levels, we need two dummy code variables. We'll make the control condition the reference group. cond.off is dummy coded such that participants with their phone off receive a 1 and all else are 0. cond.silent is coded such that participants with their phone on silent are coded 2 and all other participants are coded as 0. 
+
+# cond.off = control -> off
+dat$cond.off[dat$group == 'off'] <- 1
+dat$cond.off[dat$group == 'silent'] <- 0
+dat$cond.off[dat$group == 'calculator'] <- 0
+
+# cond.silent = control -> silent
+dat$cond.silent[dat$group == 'off'] <- 0
+dat$cond.silent[dat$group == 'silent'] <- 1
+dat$cond.silent[dat$group == 'calculator'] <- 0
+```
+
+```{r}
+# Changing the group variable from a character to a factor
+dat$group <- as.factor(dat$group)
+
+# Descriptives of your data split by condition
+# We just want to look at the descriptives for columns 1 - 5
+selected_cols <- dat[, 1:5]
+desc2 <- descriptives(data = selected_cols, hist = TRUE, sd = TRUE, range = TRUE, skew = TRUE, kurt = TRUE, splitBy = 'group')
+desc2
+```
+
+```{r}
+# Calculating moderator terms - be sure to use centered continuous predictor
+
+# Create moderator terms for positive impulsivity and group
+dat$mod.pi.off <- dat$cond.off * dat$pi.c
+dat$mod.pi.silent <- dat$cond.silent * dat$pi.c
+
+# Create moderator terms for negative impulsivity and group
+dat$mod.ni.off <- dat$cond.off * dat$ni.c
+dat$mod.ni.silent <- dat$cond.silent * dat$ni.c
+```
+
+```{r}
+# Hierarchical multiple regression examining whether group moderates the relationship between pi and wm
+model3 <- linReg(data = dat, 
+                 dep = 'wm', 
+                 covs = c('pi.c', 'cond.off', 'cond.silent', 'mod.pi.off', 'mod.pi.silent'), 
+                 blocks = list(
+                   list('cond.off', 'cond.silent'), #Add dummy coded variables together
+                   list('pi.c'), 
+                   list('mod.pi.off', 'mod.pi.silent')),#Add dummy coded moderators together
+                 modelTest = TRUE, 
+                 stdEst = TRUE,
+                 collin = TRUE,
+                 ci = TRUE)
+model3
+```
+
+```{r}
+# Interaction plot for model3
+library(dplyr)
+dat %>% 
+  ggplot() +
+  aes(x = pi, y = wm, group = group, color = group) +
+   labs(x = "Positive Impulsivity", y = "Working Memory", color = "Smartphone Condition") + ggtitle("Moderating Effect of Smartphone Condition on the Relationship Between Positive Impulsivity and Working Memory") + geom_smooth(method = "lm", fullrange = TRUE, se=T)
+```
+
+```{r}
+# Unstandardized simple slopes analysis for model 3
+model.ss2 <- lm(wm ~ pi.c + group + pi.c*group, data = dat)
+interactions::sim_slopes(model=model.ss2, pred=pi.c, modx=group)
+```
+
+```{r}
+# Hierarchical multiple regression examining whether group moderates the relationship between ni and wm
+model4 <- linReg(data = dat, 
+                 dep = 'wm', 
+                 covs = c('ni.c', 'cond.off', 'cond.silent', 'mod.ni.off', 'mod.ni.silent'), 
+                 blocks = list(
+                   list('cond.off', 'cond.silent'),
+                   list('ni.c'), 
+                   list('mod.ni.off', 'mod.ni.silent')), 
+                 modelTest = TRUE, 
+                 stdEst = TRUE,
+                 collin = TRUE,
+                 ci = TRUE)
+model4
+```
+
+```{r}
+# Interaction plot for model4
+library(dplyr)
+dat %>% 
+  ggplot() +
+  aes(x = ni, y = wm, group = group, color = group) +
+   labs(x = "Negative Impulsivity", y = "Working Memory", color = "Smartphone Condition") + ggtitle("Moderating Effect of Smartphone Condition on the Relationship Between Negative Impulsivity and Working Memory") + geom_smooth(method = "lm", fullrange = TRUE, se=T)
+```
+
+```{r}
+# Unstandardized simple slopes analysis for model 4
+model.ss3 <- lm(wm ~ ni.c + group + ni.c*group, data = dat)
+interactions::sim_slopes(model=model.ss3, pred=ni.c, modx=group)
+```
+
+
+
+

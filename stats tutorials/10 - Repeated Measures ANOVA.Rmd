@@ -1,0 +1,141 @@
+---
+title: "9 - Repeated Measures ANOVA"
+author: "Mary Peterson"
+date: "2023-08-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load the necessary packages
+library(psych)
+library(jmv)
+library(ggplot2)
+library(car)
+library(pastecs)
+library(tidyr)
+```
+
+***The Data***
+A study by Bernard and colleagues (2012) explores the following: 
+We tested the sexualized-body-inversion hypothesis in the present study: According to objectification theory (Fredrickson & Roberts, 1997), female bodies are scrutinized and evaluated more than male bodies, which leads to the sexual objectification of female people. If sexualized females are viewed as objects and sexualized males are viewed as persons at a basic cognitive level, then sexualized female bodies will be recognized equally well when inverted as when upright (object-like recognition), whereas sexualized male bodies will be recognized better when upright than when inverted (person-like recognition). 
+
+Participants viewed photos of inverted females, upright females, inverted males, and upright males and then were asked to identify which photos they had previously viewed. Their object recognition was assessed via the percentage of photos they correctly identified within each group. 
+
+Use the data from Bernard et al. (2012) to assess their research question: Does the object participants viewed (inverted female, upright female, inverted male, upright male) predict object recognition accuracy? 
+
+***The Variables***
+ID: Participant ID
+Gender: participant's self-reported gender
+Inverted_Women/Inverted_Men: Average object recognition accuracy for inverted images
+Upright_Women/Upright_Men: Average object recognition accuracy for upright images
+
+
+```{r}
+# Read in the data
+dat <- read.csv("Data for Repeated Measures ANOVA.csv")
+
+# Convert Gender from numeric to factor
+dat$Gender <- as.factor(dat$Gender)
+```
+
+```{r}
+# Right now, the data are in "wide" format, where each condition has a column and the object recognition score is under each condition column. To visualize the data, we need the data to be in "long" format, where there is one column for condition and one column for object recognition score
+
+# The pivot_longer function coverts the data from wide to long format
+
+dat_long <- pivot_longer(dat, cols = c(3:6), names_to = c("Condition"), values_to = "Recognition")
+
+# Check the dat_long data to make sure it was correctly converted. Remember, the the study used repeated measures for each condition. Because of this, there should be four rows for each participant, one with each format of picture.
+```
+
+```{r}
+# Create a graph of your data to visually see potential differences across conditions
+bar <- ggplot(dat_long, aes(Condition, Recognition))
+
+# Color 
+bar + stat_summary(fun = mean, geom = "bar", position = "dodge", fill = "hotpink") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Condition", y = "Recognition Accuracy") + ggtitle('Effect of Condition in Photo on Recognition Accuracy')
+
+# Black and White
+bar + stat_summary(fun = mean, geom = "bar", position = "dodge", fill = "grey") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Condition", y = "Recognition Accuracy") + ggtitle('Effect of Condition in Photo on Recognition Accuracy')
+```
+
+***Checking Model Assumptions***
+The assumptions for ANOVAs look very similar to those of simple and multiple regression. Hint: that's because ANOVAs are linear regression! For the description of the assumptions in the context of RM ANOVA, see here: https://www.statology.org/repeated-measures-anova-assumptions/
+
+```{r}
+# For repeated measures ANOVAs, the assumptions must be met specifically for the residuals of the DIFFERENCE scores, not just the scores for each condition. For each participant, you must calculate their recognition difference score between each condition.
+
+# Create Difference Scores. We are using the wide data to do this.
+dat$invm_invw <- (dat$Inverted_Men - dat$Inverted_Women)
+dat$invm_upm <- (dat$Inverted_Men - dat$Upright_Men)
+dat$invm_upw <- (dat$Inverted_Men - dat$Upright_Women)
+dat$invw_upm <- (dat$Inverted_Women - dat$Upright_Men)
+dat$invw_upw <- (dat$Inverted_Women - dat$Upright_Women)
+dat$upm_upw <- (dat$Upright_Men - dat$Upright_Women)
+```
+
+```{r}
+# NORMALITY 
+
+# Uses wide data
+# Get the descriptives for the difference scores so that you can see skew and kurtosis
+desc <- descriptives(dat, vars = c('invm_invw', 'invm_upm', 'invm_upw', 'invw_upm', 'invw_upw', 'upm_upw'),sd = TRUE,
+se = TRUE, skew = TRUE, kurt = TRUE)
+desc
+
+# Uses long data
+# Build model to calculate residuals
+model <- aov(Recognition ~ as.factor(Condition), data=dat_long)
+res <- model$residuals
+# Visualize residuals
+hist(res, main="Histogram of residuals", xlab="Residuals")
+
+# Shapiro Wilk test of normality
+shapiro.test(model$residuals)
+# P-value of the Shapiro-Wilk test on the residuals is significant, so the data do violate the assumption of normality
+```
+
+```{r}
+# SPHERICITY  - are the variances of the differences between all combinations of conditions equal?
+
+# The code to run a Mauchly's test, the test for sphericity, is actually incorporated in the repeated measures ANOVA we will conduct below. So, when you run the RM ANOVA, be sure to specify and check the results of the Mauchly's test before looking at the RM ANOVA results see if the assumption is met.
+
+# For Mauchly's test of Sphericity, a significant p-value indicates that the variances of the differences are not equal and the assumption has been violated.
+```
+
+***Conduct Repeated Measures ANOVA and Mauchly's***
+```{r}
+#Note: This uses wide data
+rm.anova <- anovaRM(data = dat,
+                 rm = list(list(label = 'Condition', # Dependent variable
+                                levels = c('Inverted_Women', 'Upright_Women', 'Inverted_Men', 'Upright_Men'))), #IV conditions
+                 rmCells = list(list(measure = 'Inverted_Women', cell = 'Inverted_Women'),
+                                list(measure = 'Upright_Women', cell = 'Upright_Women'),
+                                list(measure = 'Inverted_Men', cell = 'Inverted_Men'),
+                                list(measure = 'Upright_Men', cell = 'Upright_Men')),
+                 rmTerms = list('Condition'), # Dependent variable again
+                 effectSize = c('partEta', 'eta'), #Gives you effect size
+                 spherTests = TRUE, # IMPORTANT: This gives you Mauchly's to test sphericity assumption
+                 spherCorr = c('none','GG'),
+                 postHoc = list('Condition'), # Post hoc testing (Holm's) comparing conditions
+                 postHocCorr = 'holm', 
+                 emMeans = list('Condition'),
+                 emmTables = TRUE)
+rm.anova
+
+#Reminder: Before looking at RM ANOVA results, scroll down to look at results for Test of Sphericity
+```
+
+***
+
+
+
+
+
+
+
+

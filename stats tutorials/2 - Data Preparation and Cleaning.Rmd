@@ -1,0 +1,237 @@
+---
+title: "Data Preparation and Cleaning"
+author: "Mary Peterson"
+date: "2023-06-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This demonstration will use data from a study by Crum & Langer (2007) called Mindset Matters. This study investigated how the placebo effect works with exercise. In this study, 75 hotel housekeepers were either told that their daily work accounted for all the daily exercise they need, or were told nothing.
+
+
+```{r}
+# The Mindset Matters data is saved as a .csv, meaning a "comma-separated value" format, as this is really easy for computer programs to parse. If you were to open this file in a basic text editor program, you'd see rows are separated on different lines, and columns are separated by commas. In R, the readr package can understand this format and create a rectangle dataframe for us.
+
+# This installs the readr package
+install.packages("readr")
+
+# This loads the readr package from the library, so it can be used in the present code.
+library(readr)
+```
+
+```{r}
+# We've stored the mindsetmatters.csv on another website, so R will be able load it if you use the function read_csv() from the readr package and give it the web destination. Try it out below - the only argument you need for the function is the name of the file, in quotes.
+
+dat <- read_csv("https://raw.githubusercontent.com/smburns47/Psyc158/main/mindsetmatters.csv")
+
+# With this code, you are "reading in" the data (AKA loading the data file into R) and naming the dataset "dat"
+```
+
+```{r}
+# If the file with the data was on your own computer rather than on a website, you can do one of the following:
+
+# If the file is in the SAME folder as this RStudio file
+dat <- read_csv("mindsetmatters.csv")
+
+# If the file is in a DIFFERENT folder than this RStudio file (must specify file path)
+dat <- read_csv("datasets/mindsetmatters.csv")
+```
+
+```{r}
+# This will tell you information about the variables in your dataset (e.g., is R considering the variable age as numeric, a character, or a factor?)
+str(dat)
+
+# This shows the first six rows of data in your dataset
+head(dat)
+
+# Tells you the height and width of your dataframe. The first dimension always corresponds to the number of rows, and the second dimension to the number of columns.
+dim(dat)
+```
+
+#____________________________________IDENTIFYING MISSING DATA________________________________________
+```{r}
+# Missing data in R is labelled as "NA" in the cell of the corresponding variable. R also recodes blank cells as NA. If your data set represents missing data in some other way (e.g., some people put the value -999), you should recode the values as NA when working in R.
+
+# Using is.na() on the Fat2 variable to see where NA values might be
+is.na(dat$Fat2)
+```
+
+```{r}
+# This identifies the missing data for Fat2 and gives you a count of the missing data points for the variable
+sum(is.na(dat$Fat2))
+```
+
+```{r}
+# A calculation of the amount of missing data in all of your variables (e.g., 0.12 indicates 12% of data missing)
+sum(is.na(dat))/prod(dim(dat))
+
+# Simple count of missing values by variable
+colSums(is.na(dat))
+```
+
+```{r}
+# MISSINGNESS VISUALIZATIONS
+
+# Simple visualization missing data counts. Must input the column numbers of the variables that you want to see. In this case, we will look at all columns, 1:15, which means columns 1 through 15.
+install.packages("naniar")
+library(naniar)
+
+gg_miss_var(dat[1:15], show_pct = TRUE)
+
+# Another visualization pattern of missing data. The lines represent the cases (rows) in your dataset, and missing values are shown as pink boxes in the lines. For example, the top row indicates that 47 participants had no missing data. The row below it indicates that 9 paricipants had no missing data except for the Fat2 variable. 
+# By visualizing the pattern of missing data, you can gain insights into the missingness structure and identify any potential issues or biases caused by missing data.
+install.packages("mice")
+library(mice)
+
+mice::md.pattern(dat)
+
+# Here is another visualization, similar to the one above.
+install.packages("visdat")
+library(visdat)
+
+vis_miss(dat)
+
+# If you want to investigate the missingness of other variables across one variable, you can use this code. This provides a heat map looking at missingness across the Condition variable. Notice that the "uninformed" Condition has more missingness overall than the informed condition.
+gg_miss_fct(dat, fct = Condition)
+```
+
+```{r}
+# HANDLING MISSING DATA
+
+# Note: There are many methods used to handle missing data; some methods are more appropriate than others, depending on the data and it's missingness. Below are just two examples of methods that can be used - be mindful of the option that is most appropriate for your data.
+
+# Here's a helpful article that describes types of missingness and methods for handling missing data: https://journals.sagepub.com/doi/10.1177/1078087417726394 
+# Curley, C., Krause, R. M., Feiock, R., & Hawkins, C. V. (2019). Dealing with Missing Data: A Comparative Exploration of Approaches Using the Integrated City Sustainability Database. Urban Affairs Review, 55(2), 591–615. https://doi.org/10.1177/1078087417726394
+
+
+
+# OPTION 1: Listwise deletion of participants with a certain amount of missing data
+# This code identifies participants with 4 or more missing data points. 
+missing <- dat[rowSums(is.na(dat[1:15])) >= 4, ]
+missing
+
+# This code removes participants with 4 or more missing data points. If you want to remove participants with ANY missing data, you can change the 4 to a 0. Notice that we created a new dataset called "dat.lessmiss". This way, you still have the original dataset "dat" if you need to reaccess it.
+dat.lessmiss <- dat[rowSums(is.na(dat[1:15])) < 4, ]
+dat.lessmiss
+
+# Revisualize the missing data pattern with new "dat.lessmiss" dataset
+mice::md.pattern(dat.lessmiss[1:15])
+
+
+
+# OPTION 2: Predictive Mean Matching (PMM)
+# For each missing data point, PMM forms a small set of candidate "donors" (typically with 3, 5 or 10 members) from all complete cases that have predicted values closest to the predicted value for the missing entry. One donor is randomly drawn from the candidates, and the observed value of the donor replaces the missing value.
+# Note: PMM is not the best method if you have a small sample size or if there is a large proportion of incomplete cases
+# This code is using PMM by running the imputation 10 times (m = 10). You can change this number based on your desired amount of imputations. For "method = pmm", you could instead put "logreg", "polyreg", or "polyr" for binary variables, Bayesian polytomous regression, or ordered data, respectively. However, we will use pmm here.
+pmm <- mice::mice(dat[,c(1:15)], m = 10, method = "pmm")
+dat.pmm <- complete(pmm, 5)
+
+# Recheck amount of missing data. There should be no missing data after PMM.
+colSums(is.na(dat.pmm[1:15]))
+
+# For more information on predictive mean matching, check out this page: https://stefvanbuuren.name/fimd/sec-pmm.html
+```
+
+
+#____________________________________CREATING NEW VARIABLES__________________________________________
+```{r}
+# Create a new variable in the dataset "dat.lessmiss" called Ht from Wt and BMI
+dat.pmm$Ht <- dat.pmm$Wt / dat.pmm$BMI
+
+# After running the code above, click on "dat.lessmiss" in your environment at the top right of the window. Do you see the new Ht variable in the dataset?
+```
+
+```{r}
+# Making a new boolean variable to mark who is at least 40 years old
+dat.pmm$older <- dat.pmm$Age >= 40
+head(dat.pmm)
+```
+
+```{r}
+# Make a composite variable avg.bmi from variables BMI and BMI2
+dat.pmm$avg.bmi <- (dat.pmm$BMI + dat.pmm$BMI2)/2
+
+# Another option for creating composites. na.rm = TRUE will compute means for participants with missing data based on responses available. Think about if you want na.rm = TRUE, if you want participants who had did not complete every item in composite.
+dat.lessmiss$Avg.fat <- rowMeans(dat.lessmiss[,c(7:8)], na.rm = TRUE)
+
+```
+
+#____________________________________OTHER CLEANING CODES____________________________________________
+```{r}
+# RENAMING VARIABLES 
+
+#Note: The name that you want to change the variable to goes on the left side of the equal sign and the current name for the variable is on the right
+library(dplyr)
+dat.pmm <- rename(dat.pmm, c(Older = older, Avg.bmi = avg.bmi))
+```
+
+```{r}
+# RECODING VARIABLES
+
+# Changing "Cond" variable from numeric to a factor. First, check what datatype Cond is. You can also do this by selecting the dataset dat.pmm from the environment and hovering your cursor over the Cond column header.
+str(dat.pmm)
+
+#Changing Cond to a factor
+dat.pmm$Cond <- factor(dat.pmm$Cond)
+
+# Checking that Cond was successfully changed to a factor
+str(dat.pmm)
+
+
+# Recoding the values in the Cond variable to be "exp" and "control". Both the numbers and words are in quotes because they are factors. 
+dat.pmm$Cond <- recode(dat.pmm$Cond, "1" = "exp", "0" = "control")
+# If you wanted to keep the original Cond column with numbers but create a new column with "exp" and "control", you could simply change the dat.pmm$Cond at the beginning of the line of code to a new variable name such as dat.pmm$CondRecode
+
+# Tip: you can also use the recode() function to reverse code numerical variables. For example: dat$variablename <- recode(dat$variablename, '1'=7, '2'=6, '3'=5, '4'=4, '5'=3, '6'=2, '7'=1)
+```
+
+```{r}
+# REMOVING COLUMNS
+
+#Removing column 15. You can remove more than one column at a time (e.g., -c(1:4, 7))
+dat.pmm <- dat.pmm %>% dplyr::select(-c(15))
+```
+
+```{r}
+# ADDING ID COLUMN
+
+# Add a unique ID to each row in the data frame using the tibble::rowid_to_column function from the tidyverse package
+install.packages("tidyverse")
+library(tidyverse)
+dat.pmm <- tibble::rowid_to_column(dat.pmm, "ID")
+
+```
+
+```{r}
+# CALCULATING ALPHA RELIABILITY
+
+# Alpha reliability (Cronbach's alpha) a measure of internal consistency. It measures how closely participants' responses on a related set of items (e.g., the 5 items of an anxiety scale) all hang together. Cronbach's alpha can range from 0-1, with 1 indicating consistency in responses across items.
+
+install.packages("psych")
+library(psych)
+
+# Calculating alpha for the two BMI measures
+BMI.rel <- dplyr::select(dat.pmm, 6, 7)
+alpha(BMI.rel)
+
+#Calculating alpha for the two WHR measures
+WHR.rel <- dplyr::select(dat.pmm, 10, 11)
+alpha(WHR.rel)
+
+# For more information on Chronbach's alpha, check out this article: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4205511/
+# Tavakol, M., & Dennick, R. (2011). Making sense of Cronbach's alpha. International journal of medical education, 2, 53–55. https://doi.org/10.5116/ijme.4dfb.8dfd
+
+```
+
+```{r}
+# SAVING DATA
+
+#saving a data frame into a csv file
+write_csv(dat.pmm, "Clean Data.csv")
+```
+
+

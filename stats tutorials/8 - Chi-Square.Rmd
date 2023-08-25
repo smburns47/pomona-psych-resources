@@ -1,0 +1,140 @@
+---
+title: "7 - Chi-Square"
+author: "Mary Peterson"
+date: "2023-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(vcd)
+library(MASS)
+library(reshape)
+library(ggplot2)
+library(gridExtra)
+library(magrittr)
+library(AER)
+library(jmv)
+library(dplyr)
+```
+
+***Chi Square Goodness of Fit Test***
+You are an owner of a clothing company. You want to compare the proportion of shirts of each size that you ordered to those that customers purchased. You count the number of shirts that you sold that day. Are the proportions sold consistent with the proportions ordered?
+
+
+Proportions Ordered:
+10% Small 
+20% Medium  
+40% Large
+30% X-Large
+
+
+```{r}
+# Read in the data
+dat1 <- read.csv("Data for Chi-Square Goodness of Fit.csv")
+
+# Convert the size column from character to factor
+dat1$size <- as.factor(dat1$size)
+
+# Get the frequencies of sizes
+summary(dat1)
+```
+
+```{r}
+# Chi-Square Goodness of Fit test
+shirt.chi <- jmv::propTestN(data = dat1,
+               var = 'size',
+               expected = TRUE, 
+               ratio = c(.10, .20, .40, .30)) #this is where you put the expected frequencies based on the amount you ordered. Categorical variable must be sorted in order that you list your frequencies in (e.g., S, M, L, XL)
+
+shirt.chi
+
+# Results show that the observed frequencies (shirt sizes bought) are significantly different from the proportion of shirt sizes ordered. You can look at how close the expected and observed values are for each size to determine where the discrepancies are.
+```
+
+```{r}
+# What if you had ordered the same number of shirts for each size? Change all proportions to be same. Use this when you expect all the levels of your variable to be the same count.
+shirt.chi2 <- jmv::propTestN(data = dat1,
+               var = 'size',
+               expected = TRUE, 
+               ratio = c(1, 1, 1, 1)) #Changed all proportions to be the same
+
+shirt.chi2
+```
+
+***Chi-Square Test of Independence***
+A group of researchers collected data to examine the reading habits of Americans. They wanted to investigate if there are relationships between some of the demographic variables in their data such as sex, education, and employment status. 
+
+```{r}
+# Read in the data
+dat2 <- read.csv("Data for Chi-Square Test of Independence.csv")
+
+# Convert the Sex, Married, and Employment columns to factors
+dat2$Sex <- as.factor(dat2$Sex)
+dat2$Education <- as.factor(dat2$Education)
+dat2$Employment <- as.factor(dat2$Employment)
+
+
+# Get the frequencies of relevant columns
+summary(dat2[c(2, 6, 7)])
+```
+
+```{r}
+# The categories for Education are a bit wordy - this will recode them so that we can more easily view the tables we create below
+dat2 <- dat2 %>% 
+  mutate(Education = recode(Education, 
+                            "None" = "A", 
+                            "High school incomplete" = "B", 
+                            "High school graduate" = "C", 
+                            "Some college, no 4-year degree" = "D", 
+                            "Technical, trade or vocational school AFTER high school" = "E", 
+                            "College graduate" = "F", 
+                            "Post-graduate training/professional school after college" = "G"))
+```
+
+```{r}
+# We will first explore if there is a relationship between sex and education level
+
+# Create a table with the proportions by variables
+cont.table <- prop.table(xtabs(~ Sex + Education, data = dat2), 1)
+round(cont.table, 2)
+
+#visualization 
+ggplot(dat2, aes(x=Education, fill=as.factor(Sex)))+geom_bar(position = "fill")+scale_fill_brewer(palette = "Set2")+labs(y = "Percent", x = "Education Level", fill= "Sex", title = "Education Level by Sex") + theme_minimal() + theme(plot.title = element_text(hjust = 0.5))
+
+# Chi-Square test of independence
+jmv::contTables(data = dat2,
+                rows = 'Sex',
+                cols = 'Education',
+                exp = TRUE,
+                phiCra = TRUE)
+
+```
+
+```{r}
+# Same as above chunk, but now exploring the relationship between sex and employment status
+
+# Create a table with the proportions by variables
+cont.table2 <- prop.table(xtabs(~ Sex + Employment, data = dat2), 1)
+round(cont.table2, 2)
+
+#visualization 
+ggplot(dat2, aes(x=Employment, fill=as.factor(Sex)))+geom_bar(position = "fill")+scale_fill_brewer(palette = "Set2")+labs(y = "Percent", x = "Education Level", fill= "Sex", title = "Employment Status by Sex") + theme_minimal() + theme(plot.title = element_text(hjust = 0.5))
+
+# Chi-Square test of independence
+jmv::contTables(data = dat2,
+                rows = 'Sex',
+                cols = 'Employment',
+                exp = TRUE,
+                phiCra = TRUE)
+
+```
+
+
+
+
+
+

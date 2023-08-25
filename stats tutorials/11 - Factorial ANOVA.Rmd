@@ -1,0 +1,186 @@
+---
+title: "10 - Factorial ANOVA"
+author: "Mary Peterson"
+date: "2023-08-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary packages
+library(psych)
+library(jmv)
+library(ggplot2)
+library(car)
+library(pastecs)
+```
+
+***The Data***
+You are conducting an experiment to determine if there is an interaction effect of driving difficulty and conversation difficulty on the number or errors while driving. To test this, you had participants use a driving simulator. Participants were assigned to one of three levels for driving difficulty (low, moderate, difficult). They were also assigned to one of three levels for conversation difficulty (control, easy, difficult). This experiment was entirely between-subjects, meaning that there were no repeat participants for any of the levels. 
+
+***The Variables***
+IV1: Driving difficulty (L = low, M = moderate, D = difficult)
+IV2: Conversation difficulty (C = control, E = easy, D = difficult) 
+DV: Number of driving errors in driving simulator
+
+```{r}
+# Read in the data
+dat <- read.csv("Data for Factorial ANOVA.csv")
+
+# Convert convo and drive from character to factor. This will also order the data in the order you assign the levels
+dat$convo <- factor(dat$convo,levels = c("C", "E", "D"))
+dat$drive <- factor(dat$drive,levels = c("L", "M", "D"))
+```
+
+```{r}
+# Build your model so that you van visualize the data
+model <-aov(errors ~ as.factor(convo) * as.factor(drive), data = dat)
+
+# This will give you the means for each group. Helpful to get a peek of your data before running full analysis
+model.tables(model, type = "means")
+
+# Create a bar graph
+bar <- ggplot(dat, aes(drive, errors, fill = convo))
+# In color
+bar + stat_summary(fun = mean, geom = "bar", position = "dodge") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Driving Difficulty", y = "Driving Errors", fill = "Conversation Difficulty") + ggtitle('Effect of Driving and Conversation Difficulty on Errors Made') + scale_fill_manual("Conversation Difficulty", values = c("hotpink4", "seagreen3", "orange"))
+
+# In black and white
+bar + stat_summary(fun = mean, geom = "bar", position = "dodge") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Driving Difficulty", y = "Driving Errors", fill = "Conversation Difficulty") + ggtitle('Effect of Driving and Conversation Difficulty on Errors Made') + scale_fill_manual("Conversation Difficulty", values = c("gray60", "gray42", "gray23"))
+```
+
+```{r}
+# Creating a line graph
+line <- ggplot(dat, aes(drive, errors, colour = convo))
+# In color
+line + stat_summary(fun = mean, geom = "point") + stat_summary(fun.y = mean, geom = "line", aes(group = convo)) + stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) + labs(x = "Driving Difficilty", y = "Driving Errrs", colour = "Conversation Difficulty") + ggtitle('Effect of Driving and Conversation Difficulty on Errors Made') + scale_color_manual("Conversation Difficulty", values = c("hotpink4", "seagreen3", "orange"))
+
+# In black and white
+line + stat_summary(fun = mean, geom = "point") + stat_summary(fun.y = mean, geom = "line", aes(group = convo)) + stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) + labs(x = "Driving Difficilty", y = "Driving Errrs", colour = "Conversation Difficulty") + ggtitle('Effect of Driving and Conversation Difficulty on Errors Made') + scale_color_manual("Conversation Difficulty", values = c("gray60", "gray42", "gray5"))
+```
+
+***Assumptions***
+The assumptions for a factorial ANOVA are the same as they are for a one-way ANOVA. For a description of the assumptions of in the context of ANOVA, see here: https://www.statology.org/anova-assumptions/. However, you'll notice we're using a different code to check normality. The "descriptives" function, which we used for one-way ANOVA, can't check the histograms and skew/kurtosis of each group. It can only check them for each level of one IV.
+
+```{r}
+# NORMALITY
+
+# Getting the residuals of the model that we specified above and plotting it in a histogram. This histogram visualizes the residuals of each score from it's individual group mean, not the grand mean, which is what we want when checking normality.
+res <- model$residuals
+hist(res, main = "Histogram of residuals", xlab = "Residuals")
+
+# This gives you the descriptives for each group. For normality, it's most important to look at the skew and kurtosis for each group.
+by(dat$errors, list(dat$convo, dat$drive), basic = FALSE, norm = TRUE, stat.desc)
+
+# Shapiro Wilk test of normality
+shapiro.test(model$residuals)
+```
+
+```{r}
+# HOMOGENEITY OF VARIANCE
+
+# This conducts the Levene's test. You can always check Levene's in the actual ANOVA code (below) by adding the argument home = TRUE
+leveneTest(dat$errors, interaction(dat$drive, dat$convo), center = mean)
+```
+
+***Conduct Repeated Measures ANOVA***
+```{r}
+# First, you will look to see if you have an overall effect of IVs on DV. This will also give you the post hoc comparisons that look at each level of each IV separately. This will tell us if, for example, the difficult conversation group had significantly more errors on average than the easy conversation group, while holding driving difficulty constant. To see if there are any interaction effects, we will also need to run a simple effects analysis.
+
+# Run RM ANOVA
+jmv::ANOVA(data = dat, 
+           dep = 'errors', 
+           factors = c('drive', 'convo'), # Name both of your IVs here
+           effectSize = 'partEta', # Gives you effect size
+           postHoc = c('drive', 'convo'), # Post hoc testing for your IVs, describes main effects but not interaction effects
+           postHocCorr = 'tukey', 
+           postHocES = 'd',
+           emMeans = c('drive', 'convo'),
+           emmTables = TRUE)
+
+```
+
+```{r}
+# Simple effects analyses are either t-tests or ANOVAs that examine how the relationship between IV1 and the DV varies across the levels of IV2. For this study's simple effects analysis, you have two options in the way that you can split it up. 
+
+# Option 1: Split the data by driving difficulty (low, moderate, and difficult). Then, run three ANOVAS, each one using a subset of driving difficulty, comparing the means of conversation difficulty levels (control, easy, difficult). Then, compare post hoc results to see if there are significant differences between levels and, if there are, where those differences lie. 
+
+# Option 2: Split the data by conversation difficulty (control, easy, and difficult). Then, run three ANOVAS, each one using a subset of conversation difficulty, comparing the means of driving difficulty levels (low, moderate, difficult). Then, compare post hoc results to see if there are significant differences between levels and, if there are, where those differences lie. 
+
+# There is no "correct" option to choose; it depends on your research question. Are you most interested in how errors vary by conversation difficulty when at a certain level of driving difficulty? Choose option 1. Are you most interested in how errors vary by driving difficulty when at a certain level of conversation difficulty? Choose option 2. In some studies, its more clear than this one; for example, if you were testing the efficacy of three different reading programs at elementary, middle, and high schools. You would likely want to split it by school level to see which program was most helpful for each age group. 
+
+# For this example, we will split it by conversation difficulty and run ANOVAs/post hoc testing for driving difficulty.
+
+# Subsetting data by conversation difficulty
+dat.convo.cont <- subset(dat, dat$convo == "C")
+dat.convo.easy <- subset(dat, dat$convo == "E")
+dat.convo.diff <- subset(dat, dat$convo == "D")
+
+# Testing the simple effect of driving difficulty at each level of conversation difficulty
+# Control conversation difficulty
+jmv::ANOVA(data = dat.convo.cont, 
+           dep = 'errors', 
+           factors = c('drive'), 
+           effectSize = 'eta',
+           postHoc = c('drive'),
+           postHocCorr = 'tukey',
+           postHocES = 'd',
+           emMeans = 'drive', 
+           emmTables = TRUE)
+
+# Easy conversation difficulty
+jmv::ANOVA(data = dat.convo.easy, 
+           dep = 'errors', 
+           factors = c('drive'), 
+           effectSize = 'eta',
+           postHoc = c('drive'),
+           postHocCorr = 'tukey',
+           postHocES = 'd',
+           emMeans = 'drive', 
+           emmTables = TRUE)
+
+# Difficult conversation difficulty
+jmv::ANOVA(data = dat.convo.diff, 
+           dep = 'errors', 
+           factors = c('drive'), 
+           effectSize = 'eta',
+           postHoc = c('drive'),
+           postHocCorr = 'tukey',
+           postHocES = 'd',
+           emMeans = 'drive', 
+           emmTables = TRUE)
+
+# When assessing the results of these analyses, look at the post hoc testing. Those results will tell you the "story" of the interactions. It may also help you to look back at the line graph to conceptualize everything.
+
+```
+
+```{r}
+# One other note: In this example, both of our IVs had 3 levels. When both IVs have 3 or more levels, you'll need to run ANOVAS and post hoc testing. However, if you have one or more IVs with only 2 levels, you may be able to simply run t-tests where you split the data by the other IV. While this involves one less step (no post-hoc comparisons needed), only do this if it fits your research question. 
+
+# Here is an example of how to do that if one IV had 2 levels and the other had 3. This code won't run with the data from this example, but can be used in your situation if appropriate:
+
+# Subset data of IV1
+dat.sub1 <- subset(dat, dat$Position == "Condition 1")
+dat.sub2 <- subset(dat, dat$Position == "Condition 2")
+dat.sub3 <- subset(dat, dat$Position == "Condition 3")
+
+# Simple Effect
+# From subset 1
+ttestIS(data = dat.sub1, vars = 'DV', group = 'IV2', meanDiff = TRUE, ci = TRUE, effectSize = TRUE, desc = TRUE)
+
+# From subset 2
+ttestIS(data = dat.sub2, vars = 'DV', group = 'IV2', meanDiff = TRUE, ci = TRUE, effectSize = TRUE, desc = TRUE)
+
+# From subset 3
+ttestIS(data = dat.sub3, vars = 'DV', group = 'IV2', meanDiff = TRUE, ci = TRUE, effectSize = TRUE, desc = TRUE)
+```
+
+
+
+
+
+
+
+

@@ -1,0 +1,107 @@
+---
+title: "One-Way ANOVA"
+author: "Mary Peterson"
+date: "2023-07-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load the necessary packages
+library(psych)
+library(jmv)
+library(ggplot2)
+library(dplyr)
+library(car)
+library(stringr)
+```
+
+***The Data***
+A slightly altered replication of the classic Darley and Batson (1973) social psychology experiment on helping behavior was conducted by a group of researchers. This study measured the amount of help that Princeton students gave to someone in distress (who was actually a confederate for the study). Students were randomly assigned to one of three "haste" conditions, where they were told that they were either a) running early, b) on time, or c) running late for an appointment across campus. The researchers were curious if level of haste impacts amount of help provided to someone in distress. 
+
+***The Variables***
+pptID: Participant ID number
+haste: haste condition (1 = early; 2 = on time, 3 = late)
+helping: (ranges from 0 to 5, with higher scores indicating greater helping)
+
+
+```{r}
+# Read in the data
+dat <- read.csv("Data for One-Way ANOVA.csv")
+```
+
+```{r}
+# Change the content of the haste variable to their actual level names so its easier to interpret in the output
+dat$haste <- str_replace(dat$haste, "1", "early")
+dat$haste <- str_replace(dat$haste, "2", "on time")
+dat$haste <- str_replace(dat$haste, "3", "late")
+
+# Convert haste from character to a factor. It will need to be a factor for the following code
+dat$haste <- as.factor(dat$haste)
+```
+
+```{r}
+# Create a graph of your data to visually see potential differences between groups
+graph <- ggplot(dat, aes(haste, helping))
+
+# Color
+graph + stat_summary(fun = mean, geom = "bar", position = "dodge", fill="darkcyan") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Haste", y = "Helping Behavior") + ggtitle('Effect of Haste on Helping Behaviors') + theme(plot.title = element_text(hjust = 0.5))
+
+# Black and white
+graph + stat_summary(fun = mean, geom = "bar", position = "dodge", fill="slategrey") + stat_summary(fun.data = mean_cl_normal, geom = "errorbar", position = position_dodge(width = 0.90), width = 0.2) + labs(x = "Haste", y = "Helping Behavior") + ggtitle('Effect of Haste on Helping Behaviors') + theme(plot.title = element_text(hjust = 0.5))
+```
+
+***Checking Model Assumptions***
+The assumptions for ANOVAs look very similar to those of simple and multiple regression. Hint: that's because ANOVAs are linear regression! For the description of the assumptions in the context of ANOVAs, see here: https://www.statology.org/anova-assumptions/
+
+```{r}
+# NORMALITY
+
+# Get descriptive statistics for entire sample (no splitby)
+desc.sample <- descriptives(dat, vars = c('helping'), hist = TRUE, sd = TRUE, se = TRUE, skew = TRUE, kurt = TRUE)
+desc.sample
+
+# Get descriptive statistics for each haste condition
+desc.group <- descriptives(dat, vars = c('helping'), splitBy = 'haste', hist = TRUE, sd = TRUE, se = TRUE, skew = TRUE, kurt = TRUE)
+desc.group
+# Most important to look at bar graphs and skew/kurtosis
+
+# Shapiro Wilk test of normality
+model <- aov(helping ~ as.factor(haste), data = dat)
+shapiro.test(model$residuals)
+# P-value of the Shapiro-Wilk test on the residuals is not significant, so we do not reject the hypothesis that residuals follow a normal distribution
+```
+
+```{r}
+# HOMOGENEITY OF VARIANCE
+
+# Levene's test to compare variances of each group (are they significantly different from each other?)
+leveneTest(helping ~ haste, dat, center = mean)
+
+# The p-value was not significant, which shows that the variances of the groups are not significantly different from one another.So, the assumption of equal variances is met
+```
+
+***Conduct One-Way ANOVA***
+```{r}
+# This chunk of code runs a one-way between groups ANOVA with haste as the IV and helping as the DV.
+# There are several ANOVA functions in R. This one uses the ANOVA function in the jmv package. To avoid confusion, we will specify the package before the function in our code, e.g., jmv::ANOVA
+jmv::ANOVA(data = dat, 
+           dep = 'helping', # Dependent variable
+           factors = c('haste'), # Independent variable 
+           effectSize = 'partEta', # Gives you effect size
+           homo = TRUE, 
+           postHoc = c('haste'),
+           postHocCorr = 'tukey', # Gives you post hoc tests
+           postHocES = 'd', # Gives you Cohen's d
+           emMeans = list('haste'),
+           emmTables = TRUE,
+           emmPlotError = 'ci') # Gives you confidence intervals
+```
+
+
+
+
+

@@ -1,0 +1,208 @@
+---
+title: "4 - Multiple Regression and Categorical Predictors"
+author: "Mary Peterson"
+date: "2023-07-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Read in your data. As long as its in the same folder as the RMD file, this is the only code you need. You'll notice that it's the same data from the previous example. However, there is one small tweak for the purposes of this demo; the Environment variable now has three options: Home, Office, or Hybrid
+dat <- read.csv("Data for Multiple Regression.csv")
+```
+
+***The Data***
+A local business has implemented a new program to encourage employees to take more control over their workday. According to the program, employees are allowed to take their break at any point during the day for as long as they want, as long as it's 60 minutes or less. The business was wondering how this program may relate to productivity on a 1-80 scale. At the end of the first month, the business conducted a short survey which had all 205 employees report the average length of their break. The business employed you to investigate how break length may relate to productivity.
+
+***Variables***
+Length - numeric; length of break in minutes.
+Enjoy - numeric; self-reported level of enjoyment of break period (scale average; range 1-10).
+Product (Productivity) - numeric; percentage of time meeting weekly goals (range 1-80; represented as whole number).
+Environment - categorical; employee works from office, home, or hybrid.
+
+```{r}
+# Change the Environment column from character to factor
+dat$Environment <- as.factor(dat$Environment)
+
+# Creating dummy coded columns for Environment. If you have a variable with 2 levels, you just need one column. In this case, Environment has 3 levels so two dummy coded variables are needed. Office is the reference group, env.home indicates those who work at home, and env.hybrid indicates those who work hybrid.
+dat$env.home[dat$Environment == 'Office'] <- 0
+dat$env.home[dat$Environment == 'Home'] <- 1
+dat$env.home[dat$Environment == 'Hybrid'] <- 0
+
+dat$env.hybrid[dat$Environment == 'Office'] <- 0
+dat$env.hybrid[dat$Environment == 'Home'] <- 0
+dat$env.hybrid[dat$Environment == 'Hybrid'] <- 1
+
+```
+
+***Note: see prior demo (3 - Correlation and Simple Regression) for regression visualizations***
+
+```{r}
+library(jmv)
+# Correlation table for numeric variables (columns 2 - 4)
+cor <- jmv::corrMatrix(dat[2:4], flag = TRUE)
+cor
+
+# Exporting an APA formatted correlation table to the same folder that this RStudio file is saved
+library(apaTables)
+apa.cor.table(dat[c(2:4)], filename = "Correlation Table.doc", table.number = 1, show.sig.stars = TRUE, landscape = TRUE)
+```
+
+***Checking Assumptions***
+As was discussed in the simple regression demo, we must first check that the data do not violate the assumptions of linear regression (linearity, normality, independence, and homoscedasticity). Because there will now be several predictor variables in our model, multivariate normality and multicollinearity should also be checked.
+
+For more information on the assumptions of multiple linear regression, see this page: https://www.statology.org/multiple-linear-regression-assumptions/
+
+```{r}
+# LINEARITY
+
+# Scatterplot for Product and Length
+scatter1 <- ggplot(dat, aes(Length, Product))
+
+scatter1 + geom_point() + geom_smooth(method = "lm", colour = "Red") + ggtitle("Break Length Predicting Work Productivity") + labs(x = "Break Length", y = "Productivity") + theme(plot.title = element_text(hjust = 0.5))
+
+# Scatterplot for Product and Enjoy
+scatter2 <- ggplot(dat, aes(Enjoy, Product))
+
+scatter2 + geom_point() + geom_smooth(method = "lm", colour = "Red") + ggtitle("Break Enjoyment Predicting Work Productivity") + labs(x = "Break Enjoyment", y = "Productivity") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+# Homoscedasticity - Are the variances of the residuals the same across all values of X?
+
+# First, you need to specify the model that you are interested in, not including categorical predictors in (Y ~ X1 + X2)
+model <- lm(Product ~ Length + Enjoy, data = dat)
+
+# Now, use the model you just specified to plot fitted values vs. residuals. This can see if data are heteroscedastic.
+ggplot(model, aes(.fitted, .resid))+geom_point()+geom_hline(yintercept=0, col="green", linetype="dashed")+xlab("Fitted Values")+ylab("Residuals")+ggtitle("Residual vs. Fitted Plot")+theme_bw()
+
+# Breusch Pagan test of homoscedasticity
+library(car)
+ncvTest(model)
+# Significant results of this test (p < .05) indicate that the data are heteroscedastic. Interpret linear regression results with caution.
+```
+
+```{r}
+# Normality - Are the residuals normally distributed? 
+
+# Q-Q-plot to look at multivariate normality
+library(ggplot2)
+ggplot(model, aes(qqnorm(.stdresid)[[1]], .stdresid))+geom_point(na.rm = TRUE)+xlab("Theoretical Quantiles")+ylab("Standardized Residuals")+ggtitle("Normal Q-Q")
+
+# Henze-Zinkler test for multivariate normality 
+library(mvnTest)
+HZ.test(dat[c(2, 4)])
+```
+
+```{r}
+# Multicollinearity - Are the predictors highly correlated with each other?
+
+# From the model we specified above, this asks R to give us the VIF (Variance Inflation Factor) values
+vif_results <- car::vif(model)
+
+print(vif_results)
+#VIF values below 5 indicate low levels of multicollinearity. Values above 5 indicate moderate multicollinearity, and above 10 indicate extreme multicollinearity. High levels of multicollinearity may cause issues with the interpretation and stability of regression coefficients.
+```
+
+***Detecting Outliers***
+```{r}
+# Univariate outliers
+
+# Visualize univariate outliers with boxplot (for univariate outliers, you look at each variable individually)
+boxplot(dat$Length)
+boxplot(dat$Enjoy)
+boxplot(dat$Product) #Productivity has several univariate outliers
+
+
+# To remove outliers manually, you can use the slice function to remove particular rows. The code for this would be dat %>% slice(-c(3, 89))
+
+
+# But, why not let R do it for you? Here, R will identify AND remove outliers based on boxplot threshold, which you can adjust
+# Find outliers
+out_product <- performance::check_outliers(dat$Product, method = "iqr", threshold = 2) 
+# Show the row index of the outliers
+out_product 
+# Filter out those outliers
+dat_no_product_outliers <- dat[!out_product,] 
+
+# You could use this new dataset, dat_no_product_outliers for further analyses. There are also other options for handling outliers that will not be covered in this demonstration. It's important to consider what is best for your data and interpretation.
+```
+
+```{r}
+# Multivariate outliers
+
+# First, identify multivariate outliers using Mahalanobis distance. This calculation is set for a threshold of alpha = .025. You can change this based on how conservative you want your identification to be (AKA how extreme you'll allow outliers to be before excluding them).
+library(performance)
+out_multi <- check_outliers(dat[c(3:5)], method = "mahalanobis", threshold = stats::qchisq(p = 1 - 0.025, df = ncol(dat[c(3:5)])))
+
+#view multivariate outliers
+out_multi
+
+#filter out multivariate outliers
+dat.clean <- dat[!out_multi,]
+
+# Like with the univariate outliers, there are other options for handling multivariate outliers. Be sure to consider which option is best for your data and interpretation.
+```
+
+***Multiple Regression with Categorical Predictors***
+
+```{r}
+# Multiple Regression of uncentered data
+
+model.uncent <- linReg(data = dat, 
+                 dep = 'Product', 
+                 covs = c('env.home', 'env.hybrid', 'Enjoy', 'Length'), 
+                 blocks = list(
+                   list('env.home', 'env.hybrid'), #Add dummy coded variable columns in same list line
+                   list('Enjoy'),
+                   list('Length')),
+                modelTest = TRUE,
+                collin = TRUE, 
+                stdEst = TRUE,
+                r2Adj = TRUE, 
+                ci = TRUE)
+model.uncent
+```
+
+```{r}
+# Center your predictors for interpretability
+# DO NOT center outcome variable 
+# DO NOT center dummy codes
+dat$Length.c <- dat$Length - mean(dat$Length)
+dat$Enjoy.c <- dat$Enjoy - mean(dat$Enjoy)
+
+# Multiple Regression of centered data
+model.cent <- linReg(data = dat, 
+                 dep = 'Product', 
+                 covs = c('env.home', 'env.hybrid', 'Enjoy.c', 'Length.c'), 
+                 blocks = list(
+                   list('env.home', 'env.hybrid'), #Add dummy coded variable columns in same list line
+                   list('Enjoy.c'),
+                   list('Length.c')),
+                modelTest = TRUE,
+                collin = TRUE, 
+                stdEst = TRUE,
+                r2Adj = TRUE, 
+                ci = TRUE)
+model.cent
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
